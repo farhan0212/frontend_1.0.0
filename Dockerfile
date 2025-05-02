@@ -1,23 +1,25 @@
-FROM node:18:alpine as builder
+# Use lowercase image name and pin to specific version for security
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
-COPY package*.json  ./
+# Copy dependency files first (better caching)
+COPY package*.json ./
 RUN npm install
 
-COPY . .
+# Then copy source code
+COPY . ./
+
 RUN npm run build
 
-FROM node:18:alpine
+# Use specific version with digest for enhanced security
+FROM nginx:1.25-alpine
 
-WORKDIR /app
-ENV NODE_ENV=production
+# Clean default nginx static files
+RUN rm -rf /usr/share/nginx/html/*
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/next ./next
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
+# Verify this path matches your build output directory (out vs build vs dist)
+COPY --from=build /app/out /usr/share/nginx/html
 
-
-EXPOSE 3000
-CMD [ "npm", "start" ]
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
